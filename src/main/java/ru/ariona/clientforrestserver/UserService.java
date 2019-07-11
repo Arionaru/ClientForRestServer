@@ -1,53 +1,52 @@
 package ru.ariona.clientforrestserver;
 
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.apache.http.client.ClientProtocolException;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
-import java.io.IOException;
 import java.util.List;
 
 @Service
 public class UserService {
 
-    @Autowired
-    private UserManagementClient client;
+    private final String HOST = "http://localhost:8080/api/users/";
 
-    private Gson gson = new Gson();
+    private RestTemplate restTemplate;
 
-    public List<User> getUsers() {
-        List<User> users = null;
-        try {
-            users = gson.fromJson(client.getUsers(),new TypeToken<List<User>>(){}.getType());
-        } catch (IOException e) {
-            e.printStackTrace();
+    public UserService() {
+        restTemplate = new RestTemplate();
+    }
+
+    public List<User> getUsers() throws ClientProtocolException {
+        ResponseEntity<List<User>> responseEntity = restTemplate.exchange(HOST, HttpMethod.GET, null,
+                new ParameterizedTypeReference<List<User>>() {});
+
+        if (responseEntity.getStatusCode() != HttpStatus.OK) {
+            throw new ClientProtocolException("Unexpected response status: " + responseEntity.getStatusCodeValue());
         }
-        return users;
+
+        return responseEntity.getBody();
     }
 
-    public User getUserById(Long id) {
-        User user = null;
-        try {
-            user = gson.fromJson(client.getUserById(id), User.class);
-        } catch (IOException e) {
-            e.printStackTrace();
+    public User getUserById(Long id) throws ClientProtocolException{
+        System.out.println(restTemplate.getForEntity(HOST+id,User.class));
+        ResponseEntity<User> responseEntity = restTemplate.getForEntity(HOST+id,User.class);
+        if (responseEntity.getStatusCode() != HttpStatus.OK) {
+            throw new ClientProtocolException("Unexpected response status: " + responseEntity.getStatusCodeValue());
         }
-        return user;
+        return responseEntity.getBody();
     }
 
-    public String addUser(User user) {
-        return client.addUser(user);
+    public void addUser(User user) {
+        HttpHeaders httpHeaders = new HttpHeaders();
+        httpHeaders.setContentType(MediaType.APPLICATION_JSON_UTF8);
+        HttpEntity<User> httpEntity = new HttpEntity<>(user,httpHeaders);
+        restTemplate.put(HOST,httpEntity);
     }
 
-
-
-    public String editUser(User user) {
-        System.out.println(user);
-        return client.editUser(user);
-    }
-
-    public String deleteUser(Long id) {
-        return client.deleteUser(id);
+    public void deleteUser(Long id) {
+        restTemplate.delete(HOST+id);
     }
 }
